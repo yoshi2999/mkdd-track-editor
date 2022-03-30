@@ -5,3 +5,10 @@ build/*
 /piktool.ini
 object_templates/pikmin3/*
 lib/examples/*
+lib/__pycache__/*
+widgets/__pycache__/*
+.venv/*
+README.md
+LICENSE
+editor_config.ini
+log.txt

@@ -1,5 +1,6 @@
 import traceback
 import os
+import sys
 from timeit import default_timer
 from copy import deepcopy
 from io import TextIOWrapper, BytesIO, StringIO
@@ -40,7 +41,8 @@ from PyQt5.QtWidgets import QTreeWidgetItem
 from lib.bmd_render import clear_temp_folder, load_textured_bmd
 from lib.game_visualizer import Game
 PIKMIN2GEN = "Generator files (defaultgen.txt;initgen.txt;plantsgen.txt;*.txt)"
-
+if not os.path.exists('lib/temp'):
+    os.mkdir('lib/temp')
 
 def detect_dol_region(dol):
     try:
@@ -781,69 +783,9 @@ class GenEditor(QMainWindow):
             print("Reset done")
             print("Chosen file type:", chosentype)
             if chosentype == "Archived files (*.arc)" or filepath.endswith(".arc"):
-                with open(filepath, "rb") as f:
-                    try:
-                        self.loaded_archive = Archive.from_file(f)
-                        root_name = self.loaded_archive.root.name
-                        coursename = find_file(self.loaded_archive.root, "_course.bol")
-                        bol_file = self.loaded_archive[root_name + "/" + coursename]
-                        bol_data = BOL.from_file(bol_file)
-                        self.setup_bol_file(bol_data, filepath)
-                        self.leveldatatreeview.set_objects(bol_data)
-                        self.current_gen_path = filepath
-                        self.loaded_archive_file = coursename
-                    except Exception as error:
-                        print("Error appeared while loading:", error)
-                        traceback.print_exc()
-                        open_error_dialog(str(error), self)
-                        self.loaded_archive = None
-                        self.loaded_archive_file = None
-                        return
-
-                    try:
-                        additional_files = []
-                        bmdfile = get_file_safe(self.loaded_archive.root, "_course.bmd")
-                        collisionfile = get_file_safe(self.loaded_archive.root, "_course.bco")
-
-                        if bmdfile is not None:
-                            additional_files.append(os.path.basename(bmdfile.name) + " (3D Model)")
-                        if collisionfile is not None:
-                            additional_files.append(os.path.basename(collisionfile.name) + " (3D Collision)")
-
-                        if len(additional_files) > 0:
-                            additional_files.append("None")
-                            self.load_optional_3d_file_arc(additional_files, bmdfile, collisionfile, filepath)
-                    except Exception as error:
-                        print("Error appeared while loading:", error)
-                        traceback.print_exc()
-                        open_error_dialog(str(error), self)
-
+                self.load_bol(filepath, True, load_model_type)
             else:
-                with open(filepath, "rb") as f:
-                    try:
-                        bol_file = BOL.from_file(f)
-                        self.setup_bol_file(bol_file, filepath)
-                        self.leveldatatreeview.set_objects(bol_file)
-                        self.current_gen_path = filepath
-
-                        if filepath.endswith("_course.bol"):
-                            filepath_base = filepath[:-11]
-                            additional_files = []
-                            bmdfile = filepath_base+"_course.bmd"
-                            collisionfile = filepath_base+"_course.bco"
-                            if os.path.exists(bmdfile):
-                                additional_files.append(os.path.basename(bmdfile) + " (3D Model)")
-                            if os.path.exists(collisionfile):
-                                additional_files.append(os.path.basename(collisionfile) + " (3D Collision)")
-
-                            if len(additional_files) > 0:
-                                additional_files.append("None")
-                                self.load_optional_3d_file(additional_files, bmdfile, collisionfile)
-
-                    except Exception as error:
-                        print("Error appeared while loading:", error)
-                        traceback.print_exc()
-                        open_error_dialog(str(error), self)
+                self.load_bol(filepath, False, load_model_type)
 
     def load_optional_3d_file(self, additional_files, bmdfile, collisionfile):
         choice, pos = FileSelect.open_file_list(self, additional_files,
@@ -1614,6 +1556,92 @@ class GenEditor(QMainWindow):
         self.current_coordinates = pos
         self.statusbar.showMessage(str(pos))
 
+    def load_bol(self, filepath, isarc, model_to_load, is_startup=False):
+        if isarc:
+            with open(filepath, "rb") as f:
+                try:
+                    self.loaded_archive = Archive.from_file(f)
+                    root_name = self.loaded_archive.root.name
+                    coursename = find_file(self.loaded_archive.root, "_course.bol")
+                    bol_file = self.loaded_archive[root_name + "/" + coursename]
+                    bol_data = BOL.from_file(bol_file)
+                    self.setup_bol_file(bol_data, filepath)
+                    self.leveldatatreeview.set_objects(bol_data)
+                    self.current_gen_path = filepath
+                    self.loaded_archive_file = coursename
+                except Exception as error:
+                    print("Error appeared while loading:", error)
+                    traceback.print_exc()
+                    open_error_dialog(str(error), self)
+                    self.loaded_archive = None
+                    self.loaded_archive_file = None
+                    return
+
+                try:
+                    additional_files = []
+                    bmdfile = get_file_safe(self.loaded_archive.root, "_course.bmd")
+                    collisionfile = get_file_safe(self.loaded_archive.root, "_course.bco")
+
+                    if bmdfile is not None:
+                        additional_files.append(os.path.basename(bmdfile.name) + " (3D Model)")
+                    if collisionfile is not None:
+                        additional_files.append(os.path.basename(collisionfile.name) + " (3D Collision)")
+
+                    if len(additional_files) > 0:
+                        additional_files.append("None")
+                        self.load_optional_3d_file_arc(additional_files, bmdfile, collisionfile, filepath)
+                except Exception as error:
+                    print("Error appeared while loading:", error)
+                    traceback.print_exc()
+                    open_error_dialog(str(error), self)
+
+        else:  # loads a bol file
+            with open(filepath, "rb") as f:
+                try:
+                    bol_file = BOL.from_file(f)
+                    self.setup_bol_file(bol_file, filepath)
+                    self.leveldatatreeview.set_objects(bol_file)
+                    self.current_gen_path = filepath
+
+                    if filepath.endswith("_course.bol"):
+                        filepath_base = filepath[:-11]
+                        bmdfile = filepath_base + "_course.bmd"
+                        collisionfile = filepath_base + "_course.bco"
+                        if os.path.exists(collisionfile) and model_to_load == "bco" or is_startup:
+                            self.load_bco(collisionfile)
+                        elif os.path.exists(bmdfile) and model_to_load == "bmd":
+                            self.load_bmd(bmdfile)
+
+                        # if len(additional_files) > 0:
+                        #    additional_files.append("None")
+                        #    self.load_optional_3d_file(additional_files, bmdfile, collisionfile)
+
+                except Exception as error:
+                    print("Error appeared while loading:", error)
+                    traceback.print_exc()
+                    open_error_dialog(str(error), self)
+
+    def load_bmd(self, bmdfile):
+        alternative_mesh = load_textured_bmd(bmdfile)
+        with open("lib/temp/temp.obj", "r") as f:
+            verts, faces, normals = py_obj.read_obj(f)
+        self.setup_collision(verts, faces, bmdfile, alternative_mesh)
+
+    def load_bco(self, collisionfile):
+        bco_coll = RacetrackCollision()
+        verts = []
+        faces = []
+
+        with open(collisionfile, "rb") as f:
+            bco_coll.load_file(f)
+
+        for vert in bco_coll.vertices:
+            verts.append(vert)
+
+        for v1, v2, v3, collision_type, rest in bco_coll.triangles:
+            faces.append(((v1 + 1, None), (v2 + 1, None), (v3 + 1, None)))
+        model = CollisionModel(bco_coll)
+        self.setup_collision(verts, faces, collisionfile, alternative_mesh=model)
 
 class EditorHistory(object):
     def __init__(self, historysize):
@@ -1677,14 +1705,12 @@ def get_file_safe(rarc_folder, ending):
     return None
 
 
-import sys
 def except_hook(cls, exception, traceback):
     sys.__excepthook__(cls, exception, traceback)
 
 
 
 if __name__ == "__main__":
-    #import sys
     import platform
     import argparse
     from PyQt5.QtCore import QLocale
@@ -1693,17 +1719,7 @@ if __name__ == "__main__":
 
     sys.excepthook = except_hook
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--inputgen", default=None,
-                        help="Path to generator file to be loaded.")
-    parser.add_argument("--collision", default=None,
-                        help="Path to collision to be loaded.")
-    parser.add_argument("--waterbox", default=None,
-                        help="Path to waterbox file to be loaded.")
-
-    args = parser.parse_args()
-
-    app = QApplication(sys.argv)
+    app = QApplication([sys.argv[0]])
 
     if platform.system() == "Windows":
         import ctypes
@@ -1714,61 +1730,19 @@ if __name__ == "__main__":
         #sys.stdout = f
         #sys.stderr = f
         print("Python version: ", sys.version)
-        pikmin_gui = GenEditor()
-        pikmin_gui.setWindowIcon(QtGui.QIcon('resources/icon.ico'))
-
-        if args.inputgen is not None:
-            with open(args.inputgen, "r", encoding="shift_jis-2004", errors="backslashreplace") as f:
-                pikmin_gen_file = PikminGenFile()
-                pikmin_gen_file.from_file(f)
-
-            pikmin_gui.setup_gen_file(pikmin_gen_file, args.inputgen)
-
-        pikmin_gui.show()
-
-        if args.collision is not None:
-            if args.collision.endswith(".obj"):
-                with open(args.collision, "r") as f:
-                    verts, faces, normals = py_obj.read_obj(f)
-
-            elif args.collision.endswith(".bin"):
-                with open(args.collision, "rb") as f:
-                    collision = py_obj.PikminCollision(f)
-                verts = collision.vertices
-                faces = [face[0] for face in collision.faces]
-
-            elif args.collision.endswith(".szs") or args.collision.endswith(".arc"):
-                with open(args.collision, "rb") as f:
-                    archive = Archive.from_file(f)
-                f = archive["text/grid.bin"]
-                collision = py_obj.PikminCollision(f)
-
-                verts = collision.vertices
-                faces = [face[0] for face in collision.faces]
-
-            else:
-                raise RuntimeError("Unknown collision file type:", args.collision)
-
-            pikmin_gui.setup_collision(verts, faces, args.collision)
-
-        if args.waterbox is not None:
-            if args.waterbox.endswith(".txt"):
-                with open(args.waterbox, "r", encoding="shift_jis-2004", errors="backslashreplace") as f:
-                    waterboxfile = WaterboxTxt()
-                    waterboxfile.from_file(f)
-            elif args.waterbox.endswith(".szs") or args.waterbox.endwith(".arc"):
-                with open(args.waterbox, "rb") as f:
-                    archive = Archive.from_file(f)
-                    # try:
-                    f = archive["text/waterbox.txt"]
-                    # print(f.read())
-                    f.seek(0)
-                    waterboxfile = WaterboxTxt()
-                    waterboxfile.from_file(TextIOWrapper(f, encoding="shift_jis-2004", errors="backslashreplace"))
-            else:
-                raise RuntimeError("Unknown waterbox file type:", args.waterbox)
-
-            pikmin_gui.setup_waterboxes(waterboxfile)
+        mkdd_gui = GenEditor()
+        mkdd_gui.setWindowIcon(QtGui.QIcon('resources/icon.ico'))
+        load_model_type = "bco"
+        bol = False
+        for arg in sys.argv:
+            if arg[-4:] == ".bol":
+                bol = arg
+            elif arg == "bmd":
+                load_model_type = "bmd"
+        if bol:
+            mkdd_gui.load_bol(bol, False, load_model_type, True)
+            # loads a bol file -  is_arc,   bco or bmd, states wether the function being called at startup (here)
+        mkdd_gui.show()
 
         err_code = app.exec()
 

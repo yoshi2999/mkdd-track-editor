@@ -45,7 +45,7 @@ MODE_3D = 1
 
 #colors = [(1.0, 0.0, 0.0), (0.0, 0.5, 0.0), (0.0, 0.0, 1.0), (1.0, 1.0, 0.0)]
 colors = [(0.0,191/255.0,255/255.0), (30/255.0,144/255.0,255/255.0), (0.0,0.0,255/255.0), (0.0,0.0,139/255.0)]
-
+empty_default = [None]
 with open("lib/color_coding.json", "r") as f:
     colors_json = json.load(f)
     colors_selection = colors_json["SelectionColor"]
@@ -233,6 +233,7 @@ class BolMapViewer(QtWidgets.QOpenGLWidget):
         glColor4f(0.0, 0.0, 1.0, 1.0)
         
         glBegin(GL_LINES)
+        empty_default[0] = glGenLists(1)
         glVertex3f(0.0, 0.0, 0.0)
         glVertex3f(0.0, 40.0, 0.0)
         glEnd()
@@ -455,15 +456,21 @@ class BolMapViewer(QtWidgets.QOpenGLWidget):
         self.collision = Collision(verts, faces)
 
         if self.main_model is None:
-            self.main_model = glGenLists(1)
+            self.main_model = empty_default
 
         self.alternative_mesh = alternative_mesh
-
-        glNewList(self.main_model, GL_COMPILE)
-        #glBegin(GL_TRIANGLES)
-        draw_collision(verts, faces)
-        #glEnd()
-        glEndList()
+        try:
+            glNewList(self.main_model, GL_COMPILE)
+        except ctypes.ArgumentError:
+            pass
+        try:
+            draw_collision(verts, faces)
+        except OpenGL.error.GLError:
+            pass
+        try:
+            glEndList()
+        except OpenGL.error.GLError:
+            pass
 
     def set_mouse_mode(self, mode):
         assert mode in (MOUSE_MODE_NONE, MOUSE_MODE_ADDWP, MOUSE_MODE_CONNECTWP, MOUSE_MODE_MOVEWP)
