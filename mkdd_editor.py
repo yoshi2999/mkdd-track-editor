@@ -1,6 +1,8 @@
 import traceback
 import os
 import sys
+cwd = sys.argv[0].rsplit('\\', 1)[0]  # changes current working directory to always be on the editor's directory as every paths are hardcoded to be loaded from here
+os.chdir(cwd)  # changes current working directory to always be on the editor's directory as every paths are hardcoded to be loaded from here
 from timeit import default_timer
 from copy import deepcopy
 from io import TextIOWrapper, BytesIO, StringIO
@@ -41,6 +43,7 @@ from PyQt5.QtWidgets import QTreeWidgetItem
 from lib.bmd_render import clear_temp_folder, load_textured_bmd
 from lib.game_visualizer import Game
 PIKMIN2GEN = "Generator files (defaultgen.txt;initgen.txt;plantsgen.txt;*.txt)"
+
 if not os.path.exists('lib/temp'):
     os.mkdir('lib/temp')
 
