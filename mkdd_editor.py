@@ -1,5 +1,8 @@
 import traceback
 import os
+script_path = os.path.realpath(__file__)
+script_dir = os.path.dirname(script_path)
+os.chdir(script_dir)
 from timeit import default_timer
 from copy import deepcopy
 from io import TextIOWrapper, BytesIO, StringIO
